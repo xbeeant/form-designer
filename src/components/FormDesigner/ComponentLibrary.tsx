@@ -95,11 +95,16 @@ const ComponentLibrary: React.FC<ComponentLibraryProps> = ({ onDragStart }) => {
           <Card
             key={index}
             size="small"
-            className="cursor-move transition-shadow hover:shadow-md"
+            className="transform cursor-move transition-all duration-200 hover:scale-[1.02] hover:shadow-md active:scale-95"
             draggable
             onDragStart={(e) => handleDragStart(e, component)}
+            onDragEnd={(e) => e.target.classList.remove("dragging")}
           >
-            {component.label} ({component.type})
+            <div className="flex items-center gap-2">
+              <span className="text-gray-400">⋮⋮</span>
+              <span>{component.label}</span>
+              <span className="text-xs text-gray-400">({component.type})</span>
+            </div>
           </Card>
         ))}
       </Space>

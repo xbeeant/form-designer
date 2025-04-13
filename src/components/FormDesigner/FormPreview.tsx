@@ -16,7 +16,6 @@ import {
 import { DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { FormComponentProps, FormSchema } from "./types";
 
-const { Title } = Typography;
 const { TextArea } = Input;
 
 interface FormPreviewProps {
@@ -24,6 +23,9 @@ interface FormPreviewProps {
   onSelectComponent: (component: FormComponentProps) => void;
   onDeleteComponent: (component: FormComponentProps) => void;
   onDrop: (e: React.DragEvent) => void;
+  onDragOver?: (e: React.DragEvent) => void;
+  onDragLeave?: () => void;
+  isDragOver?: boolean;
   onReorder?: (dragIndex: number, dropIndex: number) => void;
 }
 
@@ -32,6 +34,9 @@ const FormPreview: React.FC<FormPreviewProps> = ({
   onSelectComponent,
   onDeleteComponent,
   onDrop,
+  onDragOver,
+  onDragLeave,
+  isDragOver,
   onReorder,
 }) => {
   const handleDragOver = (e: React.DragEvent) => {
@@ -41,6 +46,31 @@ const FormPreview: React.FC<FormPreviewProps> = ({
   const handleDragStart = (e: React.DragEvent, index: number) => {
     e.dataTransfer.setData("reorder", JSON.stringify({ dragIndex: index }));
     e.dataTransfer.effectAllowed = "move";
+
+    // Add dragging class to source element
+    const target = e.currentTarget as HTMLElement;
+    target.classList.add("opacity-50", "scale-105");
+
+    // Create a ghost image with better styling
+    const ghostElement = target.cloneNode(true) as HTMLElement;
+    ghostElement.style.transform = "scale(0.85)";
+    ghostElement.style.opacity = "0.8";
+    ghostElement.style.position = "absolute";
+    ghostElement.style.top = "-1000px";
+    document.body.appendChild(ghostElement);
+
+    e.dataTransfer.setDragImage(ghostElement, 20, 20);
+
+    // Remove the ghost element after drag starts
+    setTimeout(() => {
+      document.body.removeChild(ghostElement);
+    }, 0);
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    // Remove styling classes when drag ends
+    const target = e.currentTarget as HTMLElement;
+    target.classList.remove("opacity-50", "scale-105");
   };
 
   const handleComponentDrop = (e: React.DragEvent, dropIndex: number) => {
@@ -65,43 +95,57 @@ const FormPreview: React.FC<FormPreviewProps> = ({
   const renderFormItem = (component: FormComponentProps) => {
     const { type, label, name, placeholder, required, options } = component;
 
-    switch (type) {
-      case "input":
-        return <Input placeholder={placeholder} />;
-      case "textarea":
-        return <TextArea rows={4} placeholder={placeholder} />;
-      case "number":
-        return (
-          <InputNumber placeholder={placeholder} style={{ width: "100%" }} />
-        );
-      case "select":
-        return (
-          <Select
-            placeholder={placeholder}
-            options={options}
-            style={{ width: "100%" }}
-          />
-        );
-      case "radio":
-        return <Radio.Group options={options} />;
-      case "checkbox":
-        return <Checkbox.Group options={options} />;
-      case "date":
-        return <DatePicker style={{ width: "100%" }} />;
-      case "switch":
-        return <Switch />;
-      default:
-        return <Input placeholder={placeholder} />;
+    // 组件类型到实际组件的映射
+    const componentMap: Record<string, any> = {
+      input: Input,
+      textarea: TextArea,
+      number: InputNumber,
+      select: Select,
+      radio: Radio.Group,
+      checkbox: Checkbox.Group,
+      date: DatePicker,
+      switch: Switch,
+    };
+
+    // 根据组件类型获取对应的组件
+    const Component = componentMap[type] || Input;
+
+    // 根据组件类型准备特定的props
+    const props: Record<string, any> = {
+      placeholder,
+    };
+
+    // 为不同组件类型添加特定属性
+    if (type === "textarea") {
+      props.rows = 4;
     }
+
+    if (type === "number" || type === "select" || type === "date") {
+      props.style = { width: "100%" };
+    }
+
+    if (type === "select" || type === "radio" || type === "checkbox") {
+      props.options = options;
+    }
+
+    // 使用React.createElement创建组件
+    return React.createElement(Component, props);
   };
 
   return (
     <Card className="h-full overflow-auto">
-      <Title level={4}>表单预览</Title>
       <div
-        className="min-h-[300px] rounded-md border-2 border-dashed border-gray-300 p-4"
+        className={`min-h-[300px] rounded-md border-2 border-dashed p-4 transition-all duration-300 ${
+          isDragOver
+            ? "border-blue-400 bg-blue-50/50 shadow-inner"
+            : "border-gray-300 hover:border-blue-300 hover:bg-blue-50/30"
+        }`}
         onDrop={onDrop}
-        onDragOver={handleDragOver}
+        onDragOver={(e) => {
+          handleDragOver(e);
+          onDragOver && onDragOver(e);
+        }}
+        onDragLeave={() => onDragLeave && onDragLeave()}
       >
         {formSchema.components.length === 0 ? (
           <div className="flex h-full items-center justify-center text-gray-400">
@@ -116,8 +160,27 @@ const FormPreview: React.FC<FormPreviewProps> = ({
                 onClick={() => onSelectComponent(component)}
                 draggable
                 onDragStart={(e) => handleDragStart(e, index)}
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleComponentDrop(e, index)}
+                onDragEnd={handleDragEnd}
+                onDragOver={(e) => {
+                  handleDragOver(e);
+                  e.currentTarget.classList.add(
+                    "bg-blue-100",
+                    "border-blue-400",
+                  );
+                }}
+                onDragLeave={(e) => {
+                  e.currentTarget.classList.remove(
+                    "bg-blue-100",
+                    "border-blue-400",
+                  );
+                }}
+                onDrop={(e) => {
+                  e.currentTarget.classList.remove(
+                    "bg-blue-100",
+                    "border-blue-400",
+                  );
+                  handleComponentDrop(e, index);
+                }}
               >
                 <div className="absolute top-1/2 left-0 -ml-6 -translate-y-1/2 cursor-move opacity-0 group-hover:opacity-100">
                   <span className="text-lg text-gray-500">⋮⋮</span>
